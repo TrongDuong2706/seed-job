@@ -71,8 +71,12 @@ pipeline {
                         }
 
                         def document = readYaml file: configFile
+                        def projectFolder = (document?.folder ?: '').toString().trim()
                         (document?.pipelines ?: []).each { pipelineConfig ->
-                            pipelineConfigs << (pipelineConfig + [seedSource: configFile])
+                            pipelineConfigs << (pipelineConfig + [
+                                folder    : pipelineConfig.folder ?: projectFolder,
+                                seedSource: configFile
+                            ])
                         }
                     }
 
