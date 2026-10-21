@@ -2,8 +2,8 @@
  * Creates one Pipeline job for every pipeline entry in:
  *   centralized-jenkins-file/<application>/config.yaml
  *
- * The parser deliberately supports the small, flat YAML shape used by this
- * repository, avoiding a dependency on another YAML plugin in the seed job.
+ * YAML is parsed with the SnakeYAML API bundled with Jenkins rather than a
+ * hand-written indentation parser.
  */
 
 def configuredCentralRepoUrl = (centralRepoUrl ?: '').toString().trim()
@@ -78,59 +78,20 @@ if (generated == 0) {
     throw new IllegalStateException('No pipeline jobs were generated. Check the parsed config entries printed above.')
 }
 
-/** Parse the repository's simple list-of-maps YAML layout. */
+/** Parse `pipelines` as a list of maps using Jenkins' bundled SnakeYAML API. */
 List<Map<String, String>> parsePipelines(String yaml) {
-    List<Map<String, String>> pipelines = []
-    Map<String, String> current = null
-
-    yaml.eachLine { rawLine ->
-        String uncommented = rawLine.replaceFirst(/\s+#.*$/, '')
-        String line = uncommented.trim()
-        if (!line) {
-            return
-        }
-        int indentation = uncommented.length() - uncommented.replaceFirst(/^\s*/, '').length()
-
-        if (indentation == 0 && line == 'pipelines:') {
-            return
-        }
-
-        // Only a top-level entry under `pipelines:` starts a new job. Keeping
-        // indentation prevents nested YAML lists from becoming empty jobs.
-        if (indentation == 2 && line.startsWith('-')) {
-            current = [:]
-            pipelines << current
-            line = line.substring(1).trim()
-        }
-        if (!current || !line) {
-            return
-        }
-
-        if (indentation < 2) {
-            return
-        }
-
-        addKeyValue(current, line)
+    def document = new org.yaml.snakeyaml.Yaml().load(yaml)
+    if (!(document instanceof Map) || !(document.pipelines instanceof List)) {
+        return []
     }
 
-    return pipelines
-}
-
-void addKeyValue(Map<String, String> config, String line) {
-    int separator = line.indexOf(':')
-    if (separator <= 0) {
-        return
+    return document.pipelines.collect { entry ->
+        if (!(entry instanceof Map)) {
+            return [:]
+        }
+        entry.collectEntries { key, value ->
+            [(key.toString()): value == null ? '' : value.toString()]
+        }
     }
-
-    String key = line.substring(0, separator).trim()
-    String value = unquote(line.substring(separator + 1).trim())
-    config[key] = value
-}
-
-String unquote(String value) {
-    if (value.size() >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
-        return value.substring(1, value.size() - 1)
-    }
-    return value
 }
 
