@@ -61,7 +61,9 @@ pipeline {
                     removedJobAction: 'DISABLE',
                     removedViewAction: 'IGNORE',
                     lookupStrategy: 'JENKINS_ROOT',
-                    sandbox: true,
+                    // Job DSL sandbox requires a configured "run as specific user" policy.
+                    // This repository is admin-controlled, so approve this script once instead.
+                    sandbox: false,
                     additionalParameters: [
                         centralRepoUrl: params.CENTRAL_REPO_URL,
                         centralRepoCredentialsId: params.CENTRAL_REPO_CREDENTIALS_ID,
