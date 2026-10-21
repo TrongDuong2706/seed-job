@@ -77,31 +77,47 @@ List<Map<String, String>> parsePipelines(String yaml) {
     Map<String, String> current = null
 
     yaml.eachLine { rawLine ->
-        String line = rawLine.replaceFirst(/\s+#.*$/, '').trim()
-        if (!line || line == 'pipelines:') {
+        String uncommented = rawLine.replaceFirst(/\s+#.*$/, '')
+        String line = uncommented.trim()
+        if (!line) {
+            return
+        }
+        int indentation = uncommented.length() - uncommented.replaceFirst(/^\s*/, '').length()
+
+        if (indentation == 0 && line == 'pipelines:') {
             return
         }
 
-        if (line.startsWith('- ')) {
+        // Only a top-level entry under `pipelines:` starts a new job. Keeping
+        // indentation prevents nested YAML lists from becoming empty jobs.
+        if (indentation == 2 && line.startsWith('-')) {
             current = [:]
             pipelines << current
-            line = line.substring(2).trim()
+            line = line.substring(1).trim()
         }
         if (!current || !line) {
             return
         }
 
-        int separator = line.indexOf(':')
-        if (separator <= 0) {
+        if (indentation < 2) {
             return
         }
 
-        String key = line.substring(0, separator).trim()
-        String value = unquote(line.substring(separator + 1).trim())
-        current[key] = value
+        addKeyValue(current, line)
     }
 
     return pipelines
+}
+
+void addKeyValue(Map<String, String> config, String line) {
+    int separator = line.indexOf(':')
+    if (separator <= 0) {
+        return
+    }
+
+    String key = line.substring(0, separator).trim()
+    String value = unquote(line.substring(separator + 1).trim())
+    config[key] = value
 }
 
 String unquote(String value) {
