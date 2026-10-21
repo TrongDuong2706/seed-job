@@ -56,13 +56,34 @@ pipeline {
 
         stage('Generate Pipeline Jobs') {
             steps {
+                script {
+                    def configFiles = [
+                        'centralized-jenkins-file/todolist/config.yaml',
+                        'centralized-jenkins-file/crm/config.yaml',
+                        'centralized-jenkins-file/ecommerce/config.yaml'
+                    ]
+                    def pipelineConfigs = []
+
+                    configFiles.each { configFile ->
+                        if (!fileExists(configFile)) {
+                            echo "Skip ${configFile}: file does not exist."
+                            return
+                        }
+
+                        def document = readYaml file: configFile
+                        (document?.pipelines ?: []).each { pipelineConfig ->
+                            pipelineConfigs << (pipelineConfig + [seedSource: configFile])
+                        }
+                    }
+
+                    writeJSON file: 'seed/pipelines.json', json: pipelineConfigs, pretty: 2
+                }
+
                 jobDsl(
                     targets: 'seed/generateJobs.groovy',
                     removedJobAction: 'DISABLE',
                     removedViewAction: 'IGNORE',
                     lookupStrategy: 'JENKINS_ROOT',
-                    // Job DSL sandbox requires a configured "run as specific user" policy.
-                    // This repository is admin-controlled, so approve this script once instead.
                     sandbox: false,
                     additionalParameters: [
                         centralRepoUrl: params.CENTRAL_REPO_URL,
